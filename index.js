@@ -359,24 +359,29 @@ Scorm.prototype.status = function status (value) {
 Scorm.prototype.score = function score (value) {
 	var r = null;
 	if (value != null) {
-		var scaledScore = 0;
-		value = scaleNumberBelow(value, 100);
-		if (this.version != "1.2") {
-			scaledScore = ((value - this.scoreMin) / (this.scoreMax - this.scoreMin));
-			this.setValue(this.params('score.raw'), value);
-			this.setValue("cmi.score.scaled", scaledScore);
+		if (value == -1) {
+			this.setValue(this.params('score.raw'), NaN);
 		} else {
-			scaledScore = ((value - this.scoreMin) * (100 / (this.scoreMax - this.scoreMin)));
-			this.setValue(this.params('score.raw'), scaledScore);
-		}
-
-		if (value >= this.scoreMax) {
+			var scaledScore = 0;
+			value = scaleNumberBelow(value, 100);
 			if (this.version != "1.2") {
-				this.setValue("cmi.success_status", "passed");
+				scaledScore = ((value - this.scoreMin) / (this.scoreMax - this.scoreMin));
+				this.setValue(this.params('score.raw'), value);
+				this.setValue("cmi.score.scaled", scaledScore);
 			} else {
-				this.status("passed");
+				scaledScore = ((value - this.scoreMin) * (100 / (this.scoreMax - this.scoreMin)));
+				this.setValue(this.params('score.raw'), scaledScore);
+			}
+
+			if (value >= this.scoreMax) {
+				if (this.version != "1.2") {
+					this.setValue("cmi.success_status", "passed");
+				} else {
+					this.status("passed");
+				}
 			}
 		}
+		
 	} else {
 		r = parseInt(this.getValue(this.params('score.raw')));
 	}
@@ -385,7 +390,13 @@ Scorm.prototype.score = function score (value) {
 
 Scorm.prototype.success = function success (v) {
 	if (v != null) {
-		if (v) {
+		if (v === "unknown") {
+			if (this.version != "1.2") {
+				this.setValue("cmi.success_status", "unknown");
+			} else {
+				this.status("unknown");
+			}
+		} else if (v === true) {
 			if (this.version != "1.2") {
 				this.setValue("cmi.success_status", "passed");
 			} else {
@@ -393,7 +404,7 @@ Scorm.prototype.success = function success (v) {
 			}
 		} else {
 			if (this.version != "1.2") {
-				this.setValue("cmi.success_status", "passed");
+				this.setValue("cmi.success_status", "failed");
 			} else {
 				this.status("failed");
 			}
@@ -470,15 +481,33 @@ Scorm.prototype.initialize = function initialize () {
 	} else {
 		this.initialized = true;
 		var completionStatus = this.status();
+		var successStatut = this.success();
+		console.log("Score from wrapper", this.score());
 		if (completionStatus) {
 			switch (completionStatus) {
 				//Both SCORM 1.2 and 2004
 				case "not attempted":
+					// this.score(-1);
 					this.status("incomplete");
+					this.success("unknown");
 					break;
 					//SCORM 2004 only
 				case "unknown":
+					// this.score(-1);
 					this.status("incomplete");
+					this.success("unknown");
+					break;
+				case "incomplete":
+					// this.score(-1);
+					this.status("incomplete");
+					this.success("unknown");
+					break;
+				case "completed":
+					if (successStatut != null && successStatut == "failed") {
+						// this.score(-1);
+						this.status("incomplete");
+						this.success("unknown");
+					}
 					break;
 					//Additional options, presented here in case you'd like to use them
 					//case "completed"  : break;
@@ -506,19 +535,28 @@ Scorm.prototype.terminate = function terminate (value) {
 		return "false";
 	} else {
 		var success = false;
-		var exitValue = value;
+		
+		exitValue = "suspend";
+		
+		// var exitValue = value;
 
-		if (value === "logout" || value === "normal") {
-			if (this.version === "1.2") {
-				exitValue = "logout";
-			} else {
-				exitValue = "normal";
-			}
-		}
+		// if (value === "logout" || value === "normal") {
+		// 	if (this.version === "1.2") {
+		// 		exitValue = "logout";
+		// 	} else {
+		// 		exitValue = "normal";
+		// 	}
+		// }
 
-		if (this.completion_status !== "completed" && this.completion_status !== "passed") {
-			exitValue = "suspend";
-		}
+		// if (this.completion_status !== "completed") {
+		// 	exitValue = "suspend";
+		// } else {
+		// 	if (this.version === "1.2") {
+		// 		exitValue = "logout";
+		// 	} else {
+		// 		exitValue = "normal";
+		// 	}
+		// }
 
 		if(inArray(exitValues,this.exitValue)) { exitValue = this.exitValue; }
 
